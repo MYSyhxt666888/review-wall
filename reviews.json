@@ -1,0 +1,160 @@
+{
+  "exportedAt": "2026-09-27T10:48:13.859Z",
+  "count": 5,
+  "reviews": [
+    {
+      "id": "r1",
+      "recordId": "recvwpPsBvSnze",
+      "userId": "u_demo1",
+      "userName": "Sophia",
+      "userAvatar": "",
+      "phone": "",
+      "isVerified": true,
+      "product": "",
+      "productName": "超预期关系私董会·¥36800",
+      "studyTime": "2025年3月-6月",
+      "teacher": "乐涵老师",
+      "beforeProblem": "32岁离异带娃，圈子完全封闭，半年没有约会过任何人。对择偶标准模糊，觉得好男人都已经被挑走了，自己带着孩子没人要。",
+      "afterChange": "3个月内认识了8个匹配对象，最终和一个同频的男生确定了关系。学会了3阶段推进法，不再患得患失，知道自己要什么。",
+      "comparison": [],
+      "images": [],
+      "ratings": {
+        "professional": 5,
+        "effect": 5,
+        "service": 4,
+        "value": 4
+      },
+      "tags": [
+        "离异重启·再遇对的人",
+        "圈子打不开",
+        "已甜蜜脱单"
+      ],
+      "status": "approved",
+      "createdAt": "2026-09-27T10:48:13.857Z"
+    },
+    {
+      "id": "r2",
+      "recordId": "recvwpPt20P0D6",
+      "userId": "u_demo2",
+      "userName": "安安",
+      "userAvatar": "",
+      "phone": "",
+      "isVerified": true,
+      "product": "",
+      "productName": "锁定优质伴侣社群·¥6980",
+      "studyTime": "2025年4月-5月",
+      "teacher": "张敏老师",
+      "beforeProblem": "28岁未婚，每次和有好感的男生聊天就紧张，不知道说什么，总是尬聊后对方就冷了。试过很多相亲软件，匹配了但聊不起来。",
+      "afterChange": "学会了自然开场法和深层话题引导，现在聊天不再紧张，能聊到对方主动约见面。训练营期间就约会了2次，感觉打开了新世界。",
+      "comparison": [],
+      "images": [],
+      "ratings": {
+        "professional": 5,
+        "effect": 4,
+        "service": 5,
+        "value": 5
+      },
+      "tags": [
+        "优质男在哪·精准捕获",
+        "一聊就冷场",
+        "关系不再内耗"
+      ],
+      "status": "approved",
+      "createdAt": "2026-09-27T10:48:13.859Z"
+    },
+    {
+      "id": "r3",
+      "recordId": "recvwpPtrI4vLi",
+      "userId": "u_demo3",
+      "userName": "小诗",
+      "userAvatar": "",
+      "phone": "",
+      "isVerified": true,
+      "product": "",
+      "productName": "高净值择偶全案1V1·¥69800",
+      "studyTime": "2025年2月-5月",
+      "teacher": "李娜老师",
+      "beforeProblem": "29岁，每次谈恋爱都患得患失，总是不自觉讨好对方，最后被冷暴力分手。3段感情都是同样的模式，开始怀疑自己是不是不适合谈恋爱。",
+      "afterChange": "通过全案咨询找到了讨好型依恋的根源，学会了建立健康边界。现在和一个很尊重我的男生在一起，第一次在感情中不焦虑。",
+      "comparison": [],
+      "images": [],
+      "ratings": {
+        "professional": 5,
+        "effect": 5,
+        "service": 5,
+        "value": 5
+      },
+      "tags": [
+        "优质男在哪·精准捕获",
+        "总怕失去他",
+        "关系不再内耗",
+        "内核稳了"
+      ],
+      "status": "approved",
+      "createdAt": "2026-09-27T10:48:13.859Z"
+    },
+    {
+      "id": "r4",
+      "recordId": "recvwpPtQWj5iy",
+      "userId": "u_demo4",
+      "userName": "Wendy",
+      "userAvatar": "",
+      "phone": "",
+      "isVerified": true,
+      "product": "",
+      "productName": "锁定优质伴侣社群·¥6980",
+      "studyTime": "2025年3月-4月",
+      "teacher": "王芳老师",
+      "beforeProblem": "30岁体制内工作，圈子极度封闭，每天两点一线。想脱单但不知道怎么认识人，朋友介绍过但都不合适，开始有年龄焦虑。",
+      "afterChange": "训练营教了我拓展圈子的5个方法，现在每个月都能认识新的朋友。不是刻意相亲，而是自然社交中遇到的。心态也变好了，不再焦虑。",
+      "comparison": [],
+      "images": [],
+      "ratings": {
+        "professional": 4,
+        "effect": 4,
+        "service": 4,
+        "value": 5
+      },
+      "tags": [
+        "30+不将就·清醒脱单",
+        "圈子打不开",
+        "圈子自然打开",
+        "内核稳了"
+      ],
+      "status": "approved",
+      "createdAt": "2026-09-27T10:48:13.859Z"
+    },
+    {
+      "id": "r5",
+      "recordId": "recvwpPudfwbR4",
+      "userId": "u_demo5",
+      "userName": "Linda",
+      "userAvatar": "",
+      "phone": "",
+      "isVerified": true,
+      "product": "",
+      "productName": "高净值超预期关系1V1全案·¥128000",
+      "studyTime": "2024年9月-2025年3月",
+      "teacher": "乐涵老师",
+      "beforeProblem": "35岁外企高管，年薪百万但择偶一直不顺利。标准太高但又不愿降低，相亲30+次全部失败。觉得自己什么都好就是感情不行，但又不知道问题在哪。",
+      "afterChange": "6个月全案服务后，完全重新认知了自己的择偶定位。发现之前的“高标准”其实是在自我保护。最终和一个比自己小2岁的创业者在朋友聚会认识后自然发展，已经在一起4个月了。",
+      "comparison": [],
+      "images": [],
+      "ratings": {
+        "professional": 5,
+        "effect": 5,
+        "service": 5,
+        "value": 5
+      },
+      "tags": [
+        "30+不将就·清醒脱单",
+        "高净值择偶",
+        "不知道要什么",
+        "已甜蜜脱单",
+        "择偶认知翻盘"
+      ],
+      "status": "approved",
+      "createdAt": "2026-09-27T10:48:13.859Z"
+    }
+  ]
+}
