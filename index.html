@@ -9,32 +9,43 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+:root{
+  --rose:#9D4B5E;--rose-deep:#7a3a4a;--rose-light:#f5e9ec;
+  --gold:#c9a96e;--gold-soft:#e8dcc4;
+  --ink:#2d2a2e;--ink-soft:#5c5856;--muted:#9a9590;
+  --cream:#faf7f4;--card:#ffffff;--line:#eee8e1;
+}
 *{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:#f5f5f5;max-width:430px;margin:0 auto;min-height:100vh;position:relative;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--cream);max-width:430px;margin:0 auto;min-height:100vh;position:relative;overflow-x:hidden;color:var(--ink)}
+.serif{font-family:'Noto Serif SC',serif}
 .page{display:none;min-height:100vh;animation:fadeIn .3s ease}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
-.star-input{display:inline-block;font-size:28px;cursor:pointer;color:#ddd;transition:color .15s}
-.star-input.active{color:#fbbf24}
-.star-display{color:#fbbf24}
-.tag-chip{display:inline-block;padding:4px 12px;border-radius:16px;font-size:12px;margin:2px;cursor:pointer;transition:all .2s}
-.tag-chip.selected{background:#ec4899;color:#fff}
-.tag-chip:not(.selected){background:#f3f4f6;color:#6b7280}
+.star-input{display:inline-block;font-size:28px;cursor:pointer;color:#e0d8cf;transition:color .15s}
+.star-input.active{color:var(--gold)}
+.star-display{color:var(--gold)}
+.tag-chip{display:inline-block;padding:4px 12px;border-radius:100px;font-size:12px;margin:2px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.tag-chip.selected{background:var(--rose);color:#fff;border-color:var(--rose)}
+.tag-chip:not(.selected){background:#fff;color:var(--ink-soft);border-color:var(--line)}
+.tag-chip:not(.selected):active{background:var(--rose-light);color:var(--rose)}
 .review-card{transition:transform .15s,box-shadow .15s}
-.review-card:active{transform:scale(.98)}
+.review-card:active{transform:scale(.99)}
 .fade-in-up{animation:fadeInUp .4s ease}
 @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .upload-preview{position:relative;display:inline-block;margin:4px}
-.upload-preview img{width:72px;height:72px;object-fit:cover;border-radius:8px}
+.upload-preview img{width:72px;height:72px;object-fit:cover;border-radius:10px}
 .upload-preview .remove{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer}
-.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:12px 24px;border-radius:8px;z-index:9999;font-size:14px;animation:toastIn .3s}
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(45,42,46,.92);color:#fff;padding:12px 24px;border-radius:12px;z-index:9999;font-size:14px;animation:toastIn .3s;backdrop-filter:blur(8px)}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,-40%)}to{opacity:1;transform:translate(-50%,-50%)}}
-.nav-bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);max-width:430px;width:100%;background:#fff;border-top:1px solid #e5e7eb;z-index:100}
-.nav-bottom a{display:flex;flex-direction:column;align-items:center;padding:8px 0;font-size:11px;color:#9ca3af}
-.nav-bottom a.active{color:#ec4899}
-.gradient-header{background:linear-gradient(135deg,#ec4899 0%,#f43f5e 50%,#e11d48 100%}
+.nav-bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);max-width:430px;width:100%;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);z-index:100}
+.nav-bottom a{display:flex;flex-direction:column;align-items:center;padding:8px 0;font-size:11px;color:var(--muted);gap:2px}
+.nav-bottom a.active{color:var(--rose)}
+.gradient-header{background:linear-gradient(150deg,#2a1520 0%,#3d1f2b 45%,#4a2533 100%);position:relative;overflow:hidden}
+.gradient-header::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(201,169,110,.12),transparent 60%)}
 .text-truncate-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .text-truncate-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card{background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(45,42,46,.04),0 8px 24px rgba(45,42,46,.04);border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -336,50 +347,63 @@ function statsSection(){
   const avg=total?(approved.reduce((s,r)=>+avgRating(r)+s,0)/total).toFixed(1):0;
   const successCount=approved.filter(r=>r.tags.includes('已甜蜜脱单')).length;
   const circleCount=approved.filter(r=>r.tags.includes('圈子自然打开')).length;
-  return`<div class="gradient-header text-white px-4 pt-12 pb-6 rounded-b-3xl">
-    <h1 class="text-xl font-bold text-center mb-1">择偶定位学员评价墙</h1>
-    <p class="text-center text-xs text-white/80 mb-4">真实学员反馈 · 持续更新</p>
-    <div class="grid grid-cols-4 gap-2">
-      <div class="text-center"><div class="text-2xl font-bold">${total}</div><div class="text-xs text-white/70">学员评价</div></div>
-      <div class="text-center"><div class="text-2xl font-bold">${avg}</div><div class="text-xs text-white/70">平均评分</div></div>
-      <div class="text-center"><div class="text-2xl font-bold">${successCount}</div><div class="text-xs text-white/70">已脱单</div></div>
-      <div class="text-center"><div class="text-2xl font-bold">${circleCount}</div><div class="text-xs text-white/70">圈子打开</div></div>
+  return`<div class="gradient-header text-white px-5 pt-14 pb-7" style="border-bottom-left-radius:28px;border-bottom-right-radius:28px">
+    <div style="position:relative;z-index:1">
+      <div class="flex items-center justify-center gap-2 mb-3">
+        <span style="width:24px;height:1px;background:linear-gradient(90deg,transparent,var(--gold))"></span>
+        <span style="font-size:10px;letter-spacing:.25em;color:var(--gold)">LEHAN STUDIO</span>
+        <span style="width:24px;height:1px;background:linear-gradient(90deg,var(--gold),transparent)"></span>
+      </div>
+      <h1 class="serif text-2xl font-bold text-center mb-1" style="color:#f5f0e8;letter-spacing:.06em">择偶定位学员评价墙</h1>
+      <p class="text-center text-xs mb-6" style="color:rgba(245,240,232,.55);letter-spacing:.1em">真 实 学 员 反 馈 · 持 续 更 新</p>
+      <div class="grid grid-cols-4 gap-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:16px 8px;backdrop-filter:blur(10px)">
+        <div class="text-center"><div class="text-2xl font-bold serif" style="color:#f5f0e8">${total}</div><div class="text-xs mt-1" style="color:rgba(245,240,232,.5)">学员评价</div></div>
+        <div class="text-center" style="border-left:1px solid rgba(255,255,255,.06)"><div class="text-2xl font-bold serif" style="color:var(--gold)">${avg}</div><div class="text-xs mt-1" style="color:rgba(245,240,232,.5)">平均评分</div></div>
+        <div class="text-center" style="border-left:1px solid rgba(255,255,255,.06)"><div class="text-2xl font-bold serif" style="color:#f5f0e8">${successCount}</div><div class="text-xs mt-1" style="color:rgba(245,240,232,.5)">已脱单</div></div>
+        <div class="text-center" style="border-left:1px solid rgba(255,255,255,.06)"><div class="text-2xl font-bold serif" style="color:#f5f0e8">${circleCount}</div><div class="text-xs mt-1" style="color:rgba(245,240,232,.5)">圈子打开</div></div>
+      </div>
     </div>
   </div>`
 }
 
 function reviewCard(r){
   const product=getProduct(r.product);
-  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-9 h-9 rounded-full object-cover">`:`<div class="w-9 h-9 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-sm">${r.userName[0]}</div>`;
-  const verified=r.isVerified?'<span class="text-blue-500 text-xs ml-1">✅已认证</span>':'';
-  const tagHtml=r.tags.slice(0,3).map(t=>`<span class="tag-chip" style="font-size:10px;padding:2px 8px">${t}</span>`).join('');
-  const imgCount=r.images&&r.images.length?`<span class="text-xs text-gray-400">📷 ${r.images.length}张</span>`:'';
-  return`<div class="review-card bg-white rounded-xl p-4 mb-3 shadow-sm" onclick="navigate('detail','${r.id}')">
-    <div class="flex items-center mb-2">
+  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-10 h-10 rounded-full object-cover">`:`<div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style="background:var(--rose-light);color:var(--rose)">${r.userName[0]}</div>`;
+  const verified=r.isVerified?'<span class="text-xs ml-1" style="color:var(--gold)">✦ 已认证</span>':'';
+  const tagHtml=r.tags.slice(0,3).map(t=>`<span class="tag-chip" style="font-size:10px;padding:2px 10px">${t}</span>`).join('');
+  const imgCount=r.images&&r.images.length?`<span class="text-xs" style="color:var(--muted)">📷 ${r.images.length}张</span>`:'';
+  return`<div class="review-card rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)" onclick="navigate('detail','${r.id}')">
+    <div class="flex items-center mb-3">
       ${avatar}
-      <div class="ml-2 flex-1">
-        <div class="flex items-center"><span class="font-medium text-sm">${escapeHtml(r.userName)}</span>${verified}</div>
-        <div class="text-xs text-gray-400">${formatDate(r.createdAt)} · ${r.productName}</div>
+      <div class="ml-3 flex-1">
+        <div class="flex items-center"><span class="font-medium text-sm" style="color:var(--ink)">${escapeHtml(r.userName)}</span>${verified}</div>
+        <div class="text-xs mt-0.5" style="color:var(--muted)">${formatDate(r.createdAt)} · ${r.productName}</div>
       </div>
-      <div class="text-right"><div class="star-display text-sm">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</div><div class="text-xs text-gray-400">${avgRating(r)}分</div></div>
+      <div class="text-right"><div class="star-display text-sm">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</div><div class="text-xs mt-0.5" style="color:var(--muted)">${avgRating(r)}分</div></div>
     </div>
-    <div class="text-truncate-2 text-sm text-gray-600 mb-2">${escapeHtml(r.beforeProblem)}</div>
-    <div class="text-truncate-2 text-sm text-pink-600 mb-2">→ ${escapeHtml(r.afterChange)}</div>
-    <div class="flex items-center justify-between"><div>${tagHtml}</div>${imgCount}</div>
+    <div class="text-truncate-2 text-sm mb-1.5" style="color:var(--ink-soft);line-height:1.6">${escapeHtml(r.beforeProblem)}</div>
+    <div class="text-truncate-2 text-sm mb-3" style="color:var(--rose);line-height:1.6">→ ${escapeHtml(r.afterChange)}</div>
+    <div class="flex items-center justify-between pt-2" style="border-top:1px solid var(--line)"><div>${tagHtml}</div>${imgCount}</div>
   </div>`
 }
 
 function loginPrompt(){
-  return`<div id="page-login" class="page active" style="min-height:100vh;background:#fff">
-    <div class="gradient-header text-white px-6 pt-16 pb-12 rounded-b-3xl text-center">
-      <div class="text-5xl mb-3">💕</div>
-      <h1 class="text-2xl font-bold mb-2">学员评价系统</h1>
-      <p class="text-white/80 text-sm">看看过去的学员都经历了怎样的改变</p>
+  return`<div id="page-login" class="page active" style="min-height:100vh;background:var(--cream)">
+    <div class="gradient-header text-white px-6 pt-20 pb-14 text-center" style="border-bottom-left-radius:32px;border-bottom-right-radius:32px">
+      <div style="position:relative;z-index:1">
+        <div class="flex items-center justify-center gap-2 mb-4">
+          <span style="width:20px;height:1px;background:linear-gradient(90deg,transparent,var(--gold))"></span>
+          <span style="font-size:10px;letter-spacing:.25em;color:var(--gold)">LEHAN STUDIO</span>
+          <span style="width:20px;height:1px;background:linear-gradient(90deg,var(--gold),transparent)"></span>
+        </div>
+        <h1 class="serif text-2xl font-bold mb-2" style="color:#f5f0e8">学员评价系统</h1>
+        <p class="text-sm" style="color:rgba(245,240,232,.55)">看看过去的学员都经历了怎样的改变</p>
+      </div>
     </div>
-    <div class="px-6 pt-8">
-      <button onclick="navigate('home')" class="w-full py-3.5 rounded-xl bg-gray-100 text-gray-700 font-medium mb-3">游客浏览</button>
-      <button onclick="showLogin()" class="w-full py-3.5 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button>
-      <p class="text-center text-xs text-gray-400 mt-4">已认证学员可提交评价 · 游客可浏览全部内容</p>
+    <div class="px-6 pt-10">
+      <button onclick="navigate('home')" class="w-full py-3.5 rounded-xl font-medium mb-3" style="background:#fff;color:var(--ink-soft);border:1px solid var(--line)">游客浏览</button>
+      <button onclick="showLogin()" class="w-full py-3.5 rounded-xl font-medium text-white" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">登录 / 注册</button>
+      <p class="text-center text-xs mt-5" style="color:var(--muted)">已认证学员可提交评价 · 游客可浏览全部内容</p>
     </div>
   </div>`
 }
@@ -443,31 +467,31 @@ function init_detail(id){
   const r=store.reviews.find(x=>x.id===id);
   if(!r){toast('评价不存在');navigate('home');return}
   const product=getProduct(r.product);
-  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-12 h-12 rounded-full object-cover">`:`<div class="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-lg">${r.userName[0]}</div>`;
-  const verified=r.isVerified?'<span class="text-blue-500 text-xs">✅已认证学员</span>':'<span class="text-gray-400 text-xs">游客评价</span>';
-  const imgHtml=r.images&&r.images.length?`<div class="mt-4"><h3 class="font-bold text-sm mb-2">学习过程图片</h3><div class="grid grid-cols-3 gap-2">${r.images.map(img=>`<img src="${img}" class="w-full aspect-square object-cover rounded-lg" onclick="previewImg(this.src)">`).join('')}</div></div>`:'';
+  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-12 h-12 rounded-full object-cover">`:`<div class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg" style="background:var(--rose-light);color:var(--rose)">${r.userName[0]}</div>`;
+  const verified=r.isVerified?'<span class="text-xs" style="color:var(--gold)">✦ 已认证学员</span>':'<span class="text-xs" style="color:var(--muted)">游客评价</span>';
+  const imgHtml=r.images&&r.images.length?`<div class="mt-4"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">学习过程图片</h3><div class="grid grid-cols-3 gap-2">${r.images.map(img=>`<img src="${img}" class="w-full aspect-square object-cover rounded-lg" onclick="previewImg(this.src)">`).join('')}</div></div>`:'';
   const comparisonHtml=r.comparison.map(c=>`<div class="grid grid-cols-2 gap-2 mb-2">
-    <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">学习前</div><div class="text-sm text-gray-700">${escapeHtml(c.before)}</div></div>
-    <div class="bg-pink-50 rounded-lg p-3"><div class="text-xs text-pink-400 mb-1">学习后</div><div class="text-sm text-pink-700">${escapeHtml(c.after)}</div></div>
+    <div class="rounded-lg p-3" style="background:var(--cream)"><div class="text-xs mb-1" style="color:var(--muted)">学习前</div><div class="text-sm" style="color:var(--ink-soft)">${escapeHtml(c.before)}</div></div>
+    <div class="rounded-lg p-3" style="background:var(--rose-light)"><div class="text-xs mb-1" style="color:var(--rose)">学习后</div><div class="text-sm" style="color:var(--rose-deep)">${escapeHtml(c.after)}</div></div>
   </div>`).join('');
   const tagHtml=r.tags.map(t=>`<span class="tag-chip selected" style="cursor:default">${t}</span>`).join('');
-  const ratings=Object.entries({professional:'专业能力',effect:'实际效果',service:'服务体验',value:'性价比'}).map(([k,label])=>`<div class="flex items-center justify-between py-2 border-b border-gray-50"><span class="text-sm text-gray-600">${label}</span><span class="star-display text-sm">${'★'.repeat(r.ratings[k])}${'☆'.repeat(5-r.ratings[k])}</span></div>`).join('');
+  const ratings=Object.entries({professional:'专业能力',effect:'实际效果',service:'服务体验',value:'性价比'}).map(([k,label])=>`<div class="flex items-center justify-between py-2" style="border-bottom:1px solid var(--line)"><span class="text-sm" style="color:var(--ink-soft)">${label}</span><span class="star-display text-sm">${'★'.repeat(r.ratings[k])}${'☆'.repeat(5-r.ratings[k])}</span></div>`).join('');
   $('#page-detail').innerHTML=`
-    <div class="gradient-header text-white px-4 pt-12 pb-4">
-      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
-      <div class="flex items-center mb-3">${avatar}<div class="ml-3"><div class="flex items-center gap-2"><span class="font-bold">${escapeHtml(r.userName)}</span>${verified}</div><div class="text-xs text-white/70">${r.productName} · ${r.studyTime}</div></div></div>
-      <div class="flex items-center gap-2"><span class="text-2xl">${avgRating(r)}</span><span class="star-display text-lg">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</span><span class="text-xs text-white/60">综合评分</span></div>
+    <div class="gradient-header text-white px-4 pt-12 pb-5" style="border-bottom-left-radius:28px;border-bottom-right-radius:28px">
+      <button onclick="navigate('home')" class="text-sm mb-3" style="color:rgba(245,240,232,.7)">← 返回</button>
+      <div class="flex items-center mb-3">${avatar}<div class="ml-3"><div class="flex items-center gap-2"><span class="font-bold" style="color:#f5f0e8">${escapeHtml(r.userName)}</span>${verified}</div><div class="text-xs" style="color:rgba(245,240,232,.55)">${r.productName} · ${r.studyTime}</div></div></div>
+      <div class="flex items-center gap-2"><span class="text-2xl serif" style="color:var(--gold)">${avgRating(r)}</span><span class="star-display text-lg">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</span><span class="text-xs" style="color:rgba(245,240,232,.5)">综合评分</span></div>
     </div>
     <div class="px-4 py-4">
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">📝 基本信息</h3><div class="text-sm text-gray-600 space-y-1"><div>学习产品：<span class="font-medium">${r.productName}</span></div><div>学习时间：${r.studyTime}</div><div>指导老师：${r.teacher}</div></div></div>
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">😰 学习前的问题</h3><p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(r.beforeProblem)}</p></div>
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-pink-600">✨ 学习后的变化</h3><p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(r.afterChange)}</p></div>
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">📊 前后对比</h3>${comparisonHtml}</div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">📝 基本信息</h3><div class="text-sm space-y-1" style="color:var(--ink-soft)"><div>学习产品：<span class="font-medium" style="color:var(--ink)">${r.productName}</span></div><div>学习时间：${r.studyTime}</div><div>指导老师：${r.teacher}</div></div></div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">😰 学习前的问题</h3><p class="text-sm leading-relaxed" style="color:var(--ink-soft)">${escapeHtml(r.beforeProblem)}</p></div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--rose)">✨ 学习后的变化</h3><p class="text-sm leading-relaxed" style="color:var(--ink-soft)">${escapeHtml(r.afterChange)}</p></div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">📊 前后对比</h3>${comparisonHtml}</div>
       ${imgHtml}
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">⭐ 多维度评分</h3>${ratings}</div>
-      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">🏷️ 标签</h3><div>${tagHtml}</div></div>
-      <div class="text-xs text-gray-400 text-center mt-4">发布于 ${formatDate(r.createdAt)}</div>
-      <div class="mt-6"><a href="#" onclick="navigate('submit');return false" class="block w-full py-3 rounded-xl bg-pink-500 text-white text-center font-medium">我也要分享我的改变 →</a></div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">⭐ 多维度评分</h3>${ratings}</div>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line);box-shadow:0 2px 12px rgba(45,42,46,.04)"><h3 class="font-bold text-sm mb-2" style="color:var(--ink)">🏷️ 标签</h3><div>${tagHtml}</div></div>
+      <div class="text-xs text-center mt-4" style="color:var(--muted)">发布于 ${formatDate(r.createdAt)}</div>
+      <div class="mt-6"><a href="#" onclick="navigate('submit');return false" class="block w-full py-3.5 rounded-xl text-white text-center font-medium" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">我也要分享我的改变 →</a></div>
     </div>`;
 }
 function previewImg(src){const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center';o.onclick=()=>o.remove();o.innerHTML=`<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px">`;document.body.appendChild(o)}
@@ -477,12 +501,12 @@ function showLogin(){
   const modal=document.createElement('div');
   modal.id='login-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML=`<div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-    <h2 class="text-lg font-bold mb-4 text-center">登录 / 注册</h2>
-    <div class="mb-3"><input id="login-phone" type="tel" maxlength="11" placeholder="手机号" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-    <div class="mb-3 flex gap-2"><input id="login-code" type="tel" maxlength="6" placeholder="验证码" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm" oninput="this.value=this.value.replace(/[^0-9]/g,'')"><button id="send-code-btn" onclick="sendCode()" class="px-4 py-3 rounded-xl bg-pink-100 text-pink-600 text-sm font-medium whitespace-nowrap">获取验证码</button></div>
-    <div class="mb-3"><input id="login-name" type="text" placeholder="昵称（选填）" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"></div>
-    <button onclick="doLogin()" class="w-full py-3 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button>
+  modal.innerHTML=`<div class="rounded-2xl p-6 w-full max-w-sm" style="background:#fff">
+    <h2 class="text-lg font-bold mb-4 text-center serif" style="color:var(--ink)">登录 / 注册</h2>
+    <div class="mb-3"><input id="login-phone" type="tel" maxlength="11" placeholder="手机号" class="w-full px-4 py-3 rounded-xl text-sm" style="border:1px solid var(--line);background:var(--cream)" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+    <div class="mb-3 flex gap-2"><input id="login-code" type="tel" maxlength="6" placeholder="验证码" class="flex-1 px-4 py-3 rounded-xl text-sm" style="border:1px solid var(--line);background:var(--cream)" oninput="this.value=this.value.replace(/[^0-9]/g,'')"><button id="send-code-btn" onclick="sendCode()" class="px-4 py-3 rounded-xl text-sm font-medium whitespace-nowrap" style="background:var(--rose-light);color:var(--rose)">获取验证码</button></div>
+    <div class="mb-3"><input id="login-name" type="text" placeholder="昵称（选填）" class="w-full px-4 py-3 rounded-xl text-sm" style="border:1px solid var(--line);background:var(--cream)"></div>
+    <button onclick="doLogin()" class="w-full py-3 rounded-xl text-white font-medium" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">登录 / 注册</button>
     <button onclick="document.getElementById('login-modal').remove();navigate('home')" class="w-full py-3 mt-2 text-gray-400 text-sm">游客浏览</button>
   </div>`;
   document.body.appendChild(modal);
@@ -664,25 +688,25 @@ async function submitReview(){
 
 // --- PROFILE ---
 function init_profile(){
-  if(!isLogin()){$('#page-profile').innerHTML=`<div class="px-4 pt-16 text-center"><div class="text-5xl mb-4">👤</div><h2 class="text-lg font-bold mb-2">未登录</h2><p class="text-sm text-gray-400 mb-6">登录后可提交评价和管理个人信息</p><button onclick="showLogin()" class="px-8 py-3 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button><button onclick="navigate('home')" class="block w-full mt-3 text-gray-400 text-sm">游客浏览</button></div>`;return}
+  if(!isLogin()){$('#page-profile').innerHTML=`<div class="px-4 pt-20 text-center"><div class="text-5xl mb-4">👤</div><h2 class="text-lg font-bold mb-2 serif" style="color:var(--ink)">未登录</h2><p class="text-sm mb-6" style="color:var(--muted)">登录后可提交评价和管理个人信息</p><button onclick="showLogin()" class="px-8 py-3 rounded-xl text-white font-medium" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">登录 / 注册</button><button onclick="navigate('home')" class="block w-full mt-3 text-sm" style="color:var(--muted)">游客浏览</button></div>`;return}
   const user=store.currentUser;
   const myReviews=store.reviews.filter(r=>r.userId===user.id);
-  const avatar=user.userAvatar?`<img src="${user.userAvatar}" class="w-16 h-16 rounded-full object-cover">`:`<div class="w-16 h-16 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-2xl">${user.name[0]}</div>`;
-  const verifiedHtml=user.isVerified?'<span class="text-blue-500 text-xs">✅已认证学员</span>':'<span class="text-orange-500 text-xs">⚠️未认证</span>';
+  const avatar=user.userAvatar?`<img src="${user.userAvatar}" class="w-16 h-16 rounded-full object-cover">`:`<div class="w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl" style="background:var(--rose-light);color:var(--rose)">${user.name[0]}</div>`;
+  const verifiedHtml=user.isVerified?'<span class="text-xs" style="color:var(--gold)">✦ 已认证学员</span>':'<span class="text-xs" style="color:#d97706">⚠️ 未认证</span>';
   const myReviewHtml=myReviews.length?myReviews.map(r=>{
-    const statusMap={approved:'<span class="text-green-500 text-xs">已发布</span>',pending:'<span class="text-orange-500 text-xs">审核中</span>',rejected:'<span class="text-red-500 text-xs">未通过</span>'};
-    return`<div class="bg-white rounded-xl p-3 mb-2 shadow-sm" onclick="navigate('detail','${r.id}')"><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium">${r.productName}</span>${statusMap[r.status]||''}</div><div class="text-xs text-gray-400">${formatDate(r.createdAt)}</div></div>`
-  }).join(''):'<div class="text-center py-8 text-gray-400 text-sm">还没有评价，去分享你的经历吧</div>';
+    const statusMap={approved:'<span class="text-xs" style="color:#16a34a">已发布</span>',pending:'<span class="text-xs" style="color:#d97706">审核中</span>',rejected:'<span class="text-xs" style="color:#dc2626">未通过</span>'};
+    return`<div class="rounded-xl p-3 mb-2" style="background:var(--cream);border:1px solid var(--line)" onclick="navigate('detail','${r.id}')"><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium" style="color:var(--ink)">${r.productName}</span>${statusMap[r.status]||''}</div><div class="text-xs" style="color:var(--muted)">${formatDate(r.createdAt)}</div></div>`
+  }).join(''):'<div class="text-center py-8 text-sm" style="color:var(--muted)">还没有评价，去分享你的经历吧</div>';
   $('#page-profile').innerHTML=`
-    <div class="gradient-header text-white px-4 pt-12 pb-6 rounded-b-3xl">
-      <div class="flex items-center mb-4">${avatar}<div class="ml-3"><div class="font-bold text-lg">${escapeHtml(user.name)}</div><div class="text-xs text-white/70">${user.phone}</div><div class="mt-1">${verifiedHtml}</div></div></div>
+    <div class="gradient-header text-white px-4 pt-12 pb-6" style="border-bottom-left-radius:28px;border-bottom-right-radius:28px">
+      <div class="flex items-center mb-1">${avatar}<div class="ml-3"><div class="font-bold text-lg" style="color:#f5f0e8">${escapeHtml(user.name)}</div><div class="text-xs" style="color:rgba(245,240,232,.55)">${user.phone}</div><div class="mt-1">${verifiedHtml}</div></div></div>
     </div>
     <div class="px-4 pt-4">
-      <div class="bg-white rounded-xl p-4 shadow-sm mb-3"><h3 class="text-sm font-bold mb-3">我的评价 (${myReviews.length})</h3>${myReviewHtml}</div>
-      <button onclick="navigate('submit')" class="w-full py-3 rounded-xl bg-pink-50 text-pink-600 font-medium text-sm mb-2">+ 写新评价</button>
-      <button onclick="navigate('qrcode')" class="w-full py-3 rounded-xl bg-gray-50 text-gray-600 font-medium text-sm mb-2">📱 生成评价墙二维码</button>
-      <button onclick="navigate('admin')" class="w-full py-3 rounded-xl bg-gray-50 text-gray-600 font-medium text-sm mb-2">⚙️ 管理后台</button>
-      <button onclick="logout()" class="w-full py-3 rounded-xl bg-gray-50 text-red-500 font-medium text-sm">退出登录</button>
+      <div class="rounded-2xl p-4 mb-3" style="background:#fff;border:1px solid var(--line)"><h3 class="text-sm font-bold mb-3" style="color:var(--ink)">我的评价 (${myReviews.length})</h3>${myReviewHtml}</div>
+      <button onclick="navigate('submit')" class="w-full py-3 rounded-xl font-medium text-sm mb-2" style="background:var(--rose-light);color:var(--rose)">+ 写新评价</button>
+      <button onclick="navigate('qrcode')" class="w-full py-3 rounded-xl font-medium text-sm mb-2" style="background:#fff;color:var(--ink-soft);border:1px solid var(--line)">📱 生成评价墙二维码</button>
+      <button onclick="navigate('admin')" class="w-full py-3 rounded-xl font-medium text-sm mb-2" style="background:#fff;color:var(--ink-soft);border:1px solid var(--line)">⚙️ 管理后台</button>
+      <button onclick="logout()" class="w-full py-3 rounded-xl font-medium text-sm" style="background:#fff;color:#dc2626;border:1px solid var(--line)">退出登录</button>
     </div>`;
 }
 function logout(){store.currentUser=null;saveStore(store);toast('已退出');navigate('home')}
@@ -752,20 +776,20 @@ async function toggleUserVerified(userId){
 function init_qrcode(){
   const url=location.origin+location.pathname;
   $('#page-qrcode').innerHTML=`
-    <div class="gradient-header text-white px-4 pt-12 pb-4">
-      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
-      <h1 class="text-xl font-bold">评价墙二维码</h1>
-      <p class="text-xs text-white/70 mt-1">扫码即可进入学员评价墙</p>
+    <div class="gradient-header text-white px-4 pt-12 pb-5" style="border-bottom-left-radius:28px;border-bottom-right-radius:28px">
+      <button onclick="navigate('home')" class="text-sm mb-3" style="color:rgba(245,240,232,.7)">← 返回</button>
+      <h1 class="serif text-xl font-bold" style="color:#f5f0e8">评价墙二维码</h1>
+      <p class="text-xs mt-1" style="color:rgba(245,240,232,.55)">扫码即可进入学员评价墙</p>
     </div>
     <div class="px-4 py-6 text-center">
-      <div class="bg-white rounded-2xl p-6 shadow-sm mx-auto inline-block">
+      <div class="rounded-2xl p-6 mx-auto inline-block" style="background:#fff;border:1px solid var(--line);box-shadow:0 8px 30px rgba(45,42,46,.06)">
         <div id="qrcode-container" class="inline-block"></div>
-        <h2 class="text-lg font-bold mt-4 text-gray-800">择偶定位学员评价墙</h2>
-        <p class="text-xs text-gray-400 mt-1">扫码查看真实学员反馈</p>
+        <h2 class="serif text-lg font-bold mt-4" style="color:var(--ink)">择偶定位学员评价墙</h2>
+        <p class="text-xs mt-1" style="color:var(--muted)">扫码查看真实学员反馈</p>
       </div>
-      <div class="mt-6 bg-white rounded-xl p-4 shadow-sm text-left">
-        <h3 class="text-sm font-bold mb-2">📋 使用说明</h3>
-        <ol class="text-xs text-gray-500 space-y-1 list-decimal pl-4">
+      <div class="mt-6 rounded-xl p-4 text-left" style="background:#fff;border:1px solid var(--line)">
+        <h3 class="text-sm font-bold mb-2" style="color:var(--ink)">📋 使用说明</h3>
+        <ol class="text-xs space-y-1.5 list-decimal pl-4" style="color:var(--ink-soft)">
           <li>将二维码打印或发送给学员</li>
           <li>学员扫码后进入评价墙</li>
           <li>游客可直接浏览所有评价</li>
@@ -773,16 +797,16 @@ function init_qrcode(){
           <li>管理员在「我的→管理后台」审核评价</li>
         </ol>
       </div>
-      <div class="mt-4 bg-gray-50 rounded-xl p-3">
-        <p class="text-xs text-gray-400 mb-1">评价墙链接：</p>
-        <p class="text-xs text-blue-500 break-all">${url}</p>
+      <div class="mt-4 rounded-xl p-3" style="background:var(--cream);border:1px solid var(--line)">
+        <p class="text-xs mb-1" style="color:var(--muted)">评价墙链接：</p>
+        <p class="text-xs break-all" style="color:var(--rose)">${url}</p>
       </div>
-      <button onclick="downloadQR()" class="mt-4 px-8 py-2.5 rounded-xl bg-pink-500 text-white text-sm font-medium">保存二维码图片</button>
+      <button onclick="downloadQR()" class="mt-4 px-8 py-2.5 rounded-xl text-white text-sm font-medium" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">保存二维码图片</button>
     </div>`;
   // Generate QR code
   const container=$('#qrcode-container');
   container.innerHTML='';
-  new QRCode(container,{text:url,width:200,height:200,colorDark:'#1f2937',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+  new QRCode(container,{text:url,width:200,height:200,colorDark:'#2d2a2e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
 }
 function downloadQR(){
   const img=$('#qrcode-container img');
