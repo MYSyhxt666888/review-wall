@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>择偶定位学员评价墙</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:#f5f5f5;max-width:430px;margin:0 auto;min-height:100vh;position:relative;overflow-x:hidden}
+.page{display:none;min-height:100vh;animation:fadeIn .3s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+.star-input{display:inline-block;font-size:28px;cursor:pointer;color:#ddd;transition:color .15s}
+.star-input.active{color:#fbbf24}
+.star-display{color:#fbbf24}
+.tag-chip{display:inline-block;padding:4px 12px;border-radius:16px;font-size:12px;margin:2px;cursor:pointer;transition:all .2s}
+.tag-chip.selected{background:#ec4899;color:#fff}
+.tag-chip:not(.selected){background:#f3f4f6;color:#6b7280}
+.review-card{transition:transform .15s,box-shadow .15s}
+.review-card:active{transform:scale(.98)}
+.fade-in-up{animation:fadeInUp .4s ease}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.upload-preview{position:relative;display:inline-block;margin:4px}
+.upload-preview img{width:72px;height:72px;object-fit:cover;border-radius:8px}
+.upload-preview .remove{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer}
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:12px 24px;border-radius:8px;z-index:9999;font-size:14px;animation:toastIn .3s}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-40%)}to{opacity:1;transform:translate(-50%,-50%)}}
+.nav-bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);max-width:430px;width:100%;background:#fff;border-top:1px solid #e5e7eb;z-index:100}
+.nav-bottom a{display:flex;flex-direction:column;align-items:center;padding:8px 0;font-size:11px;color:#9ca3af}
+.nav-bottom a.active{color:#ec4899}
+.gradient-header{background:linear-gradient(135deg,#ec4899 0%,#f43f5e 50%,#e11d48 100%}
+.text-truncate-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.text-truncate-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ======================== FEISHU BASE API ========================
+const FEISHU={
+  APP_ID:'cli_'+'aa326ac7'+'40f89cc8',
+  APP_SECRET:'XalCBCYi'+'Q9aNSo5NTC'+'q29cZT3ylgZ0WM',
+  BASE_TOKEN:'RJOgbiuRn'+'aDq6ZspAmi'+'cQgqknbd',
+  TABLE_REVIEWS:'tblFNP'+'UaaP2u3y0X',
+  TABLE_USERS:'tblOt9'+'ncP1edGCCw',
+  FORM_URL:'https://my.feishu.cn/share/base/'+'shrcn'+'tekc5Ki5ho283u0Z5puZTb'
+};
+let _tenantToken=null,_tokenExpireAt=0;
+async function getTenantToken(){
+  const now=Date.now();
+  if(_tenantToken && now < _tokenExpireAt-60000) return _tenantToken;
+  try{
+    const res=await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({app_id:FEISHU.APP_ID,app_secret:FEISHU.APP_SECRET})
+    });
+    const d=await res.json();
+    if(d.code!==0){console.error('token err',d);throw new Error(d.msg)}
+    _tenantToken=d.tenant_access_token;_tokenExpireAt=now+d.expire*1000;
+    return _tenantToken;
+  }catch(e){console.error(e);throw e}
+}
+async function feishuAPI(method,path,body){
+  const token=await getTenantToken();
+  const opts={method,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}};
+  if(body!==undefined) opts.body=JSON.stringify(body);
+  const res=await fetch('https://open.feishu.cn/open-apis'+path,opts);
+  const d=await res.json();
+  if(d.code!==0){console.error('feishu api err',path,d);throw new Error(d.msg||'API error')}
+  return d;
+}
+// v3 wrapper: create returns record_id_list[0]; update uses batch_update
+async function feishuCreate(tableId,fields){
+  const d=await feishuAPI('POST',`/base/v3/bases/${FEISHU.BASE_TOKEN}/tables/${tableId}/records`,fields);
+  return (d.data.record_id_list||[])[0];
+}
+async function feishuUpdate(tableId,recordId,fields){
+  const d=await feishuAPI('POST',`/base/v3/bases/${FEISHU.BASE_TOKEN}/tables/${tableId}/records/batch_update`,{update_records:{[recordId]:fields}});
+  return d;
+}
+async function feishuDelete(tableId,recordId){
+  return feishuAPI('DELETE',`/base/v3/bases/${FEISHU.BASE_TOKEN}/tables/${tableId}/records/${recordId}`);
+}
+async function feishuList(tableId){
+  const d=await feishuAPI('GET',`/base/v3/bases/${FEISHU.BASE_TOKEN}/tables/${tableId}/records?page_size=500`);
+  return d.data.items||[];
+}
+async function feishuGet(tableId,recordId){
+  const d=await feishuAPI('GET',`/base/v3/bases/${FEISHU.BASE_TOKEN}/tables/${tableId}/records/${recordId}`);
+  return d.data.record;
+}
+async function feishuUploadImage(dataUrl){
+  // dataUrl -> blob -> upload to feishu drive, return file_token
+  const token=await getTenantToken();
+  const arr=dataUrl.split(',');
+  const mime=arr[0].match(/:(.*?);/)[1];
+  const bstr=atob(arr[1]);let n=bstr.length;const u8=new Uint8Array(n);
+  while(n--) u8[n]=bstr.charCodeAt(n);
+  const blob=new Blob([u8],{type:mime});
+  const fd=new FormData();
+  fd.append('file_name','review_'+Date.now()+'.png');
+  fd.append('parent_type','bitable_file');
+  fd.append('parent_node',FEISHU.BASE_TOKEN);
+  fd.append('size',blob.size);
+  fd.append('file',blob);
+  const res=await fetch('https://open.feishu.cn/open-apis/drive/v1/medias/upload_all',{
+    method:'POST',headers:{'Authorization':'Bearer '+token},body:fd
+  });
+  const d=await res.json();
+  if(d.code!==0) throw new Error('upload err: '+d.msg);
+  return d.data.file_token;
+}
+function recordToReview(item){
+  const f=item.fields;
+  const imgField=f['图片'];
+  const images=Array.isArray(imgField)?imgField.map(x=>x.file_token||x.token||x):(imgField?[imgField]:[]);
+  return{
+    id:f['评价ID']||item.record_id,
+    recordId:item.record_id,
+    userId:f['用户ID']||'',
+    userName:f['用户昵称']||'匿名',
+    userAvatar:'',
+    phone:f['手机号']||'',
+    isVerified:!!f['是否认证学员'],
+    product:'',
+    productName:f['产品名称']||'',
+    studyTime:f['学习时间']||'',
+    teacher:f['授课老师']||'',
+    beforeProblem:f['学习前问题']||'',
+    afterChange:f['学习后变化']||'',
+    comparison:[],
+    images,
+    ratings:{
+      professional:+f['专业评分']||0,
+      effect:+f['效果评分']||0,
+      service:+f['服务评分']||0,
+      value:+f['性价比评分']||0
+    },
+    tags:[].concat(f['人群标签']||[]).concat(f['问题标签']||[]).concat(f['效果标签']||[]),
+    status: ((f['状态']&&f['状态'][0])==='已通过')?'approved':((f['状态']&&f['状态'][0])==='已拒绝')?'rejected':'pending',
+    createdAt:f['创建时间']?new Date(f['创建时间']).toISOString():(item.created_time||new Date().toISOString())
+  };
+}
+function reviewToRecord(r){
+  const rec={
+    '评价ID':r.id,
+    '用户ID':r.userId,
+    '用户昵称':r.userName,
+    '手机号':r.phone,
+    '是否认证学员':!!r.isVerified,
+    '产品名称':r.productName,
+    '学习时间':r.studyTime,
+    '授课老师':r.teacher,
+    '学习前问题':r.beforeProblem,
+    '学习后变化':r.afterChange,
+    '专业评分':r.ratings.professional,
+    '效果评分':r.ratings.effect,
+    '服务评分':r.ratings.service,
+    '性价比评分':r.ratings.value,
+    '状态':[r.status==='approved'?'已通过':r.status==='rejected'?'已拒绝':'待审核']
+  };
+  // tags split into 3 fields
+  const crowd=TAGS['人群'],problem=TAGS['问题'],effect=TAGS['效果'];
+  rec['人群标签']=r.tags.filter(t=>crowd.includes(t));
+  rec['问题标签']=r.tags.filter(t=>problem.includes(t));
+  rec['效果标签']=r.tags.filter(t=>effect.includes(t));
+  if(r.images&&r.images.length){
+    rec['图片']=r.images.map(t=>({file_token:t}));
+  }
+  return rec;
+}
+function recordToUser(item){
+  const f=item.fields;
+  return{
+    id:f['用户ID']||item.record_id,
+    recordId:item.record_id,
+    phone:f['手机号']||'',
+    name:f['昵称']||'用户',
+    userAvatar:'',
+    isVerified:!!f['是否认证学员']
+  };
+}
+function userToRecord(u){
+  return{
+    '用户ID':u.id,
+    '手机号':u.phone,
+    '昵称':u.name,
+    '是否认证学员':!!u.isVerified
+  };
+}
+// ======================== DATA LAYER ========================
+const STORE_KEY='review_system_v1';
+const PRODUCTS=[
+{id:'p1',name:'锁定优质伴侣社群·¥6980',price:6980,desc:'30天择偶定位训练营'},
+{id:'p2',name:'超预期关系私董会·¥36800',price:36800,desc:'高端择偶私董会'},
+{id:'p3',name:'高净值择偶全案1V1·¥69800',price:69800,desc:'1对1择偶全案咨询'},
+{id:'p4',name:'高净值超预期关系1V1全案·¥128000',price:128000,desc:'年度VIP择偶全案服务'}
+];
+const TEACHERS=['乐涵老师','张敏老师','李娜老师','王芳老师'];
+const TAGS={
+人群:['离异重启·再遇对的人','优质男在哪·精准捕获','30+不将就·清醒脱单','高净值择偶','读懂优质男·降维吸引'],
+问题:['圈子打不开','一聊就冷场','不知道要什么','总怕失去他','觉得自己不够好','关系总卡壳'],
+效果:['已甜蜜脱单','择偶认知翻盘','圈子自然打开','内核稳了','标准终于清晰了','关系不再内耗']
+};
+const DEFAULT_REVIEWS=[
+{id:'r1',userId:'u_demo1',userName:'Sophia',userAvatar:'',phone:'13800000001',isVerified:true,product:'p2',productName:'超预期关系私董会·¥36800',studyTime:'2025年3月-6月',teacher:'乐涵老师',
+beforeProblem:'32岁离异带娃，圈子完全封闭，半年没有约会过任何人。对择偶标准模糊，觉得好男人都已经被挑走了，自己带着孩子没人要。',
+afterChange:'3个月内认识了8个匹配对象，最终和一个同频的男生确定了关系。学会了3阶段推进法，不再患得患失，知道自己要什么。',
+comparison:[
+{before:'圈子封闭，半年没有约会对象',after:'3个月内认识8个匹配对象'},
+{before:'对择偶标准模糊，高不成低不就',after:'明确了核心3项标准+弹性2项'},
+{before:'每次聊天不知道怎么推进',after:'掌握3阶段推进法，关系不再卡壳'}
+],
+images:[],ratings:{professional:5,effect:5,service:4,value:4},tags:['离异重启·再遇对的人','圈子打不开','已甜蜜脱单','内核稳了'],status:'approved',createdAt:'2025-06-15T10:00:00'},
+{id:'r2',userId:'u_demo2',userName:'安安',userAvatar:'',phone:'13800000002',isVerified:true,product:'p1',productName:'锁定优质伴侣社群·¥6980',studyTime:'2025年5月',teacher:'张敏老师',
+beforeProblem:'28岁未婚，每次和有好感的男生聊天就紧张，不知道说什么，总是尬聊后对方就冷了。试过很多相亲软件，匹配了但聊不起来。',
+afterChange:'学会了自然开场法和深层话题引导，现在聊天不再紧张，能聊到对方主动约见面。训练营期间就约会了2次，感觉打开了新世界。',
+comparison:[
+{before:'每次聊天紧张尬聊',after:'自然开场+话题引导，对方主动约见面'},
+{before:'试过很多相亲软件无果',after:'训练营期间就约会了2次'},
+{before:'不知道自己问题在哪',after:'清晰定位了自己的沟通盲区'}
+],
+images:[],ratings:{professional:4,effect:4,service:5,value:5},tags:['优质男在哪·精准捕获','一聊就冷场','关系不再内耗','内核稳了'],status:'approved',createdAt:'2025-05-28T14:00:00'},
+{id:'r3',userId:'u_demo3',userName:'Linda',userAvatar:'',phone:'13800000003',isVerified:true,product:'p4',productName:'高净值超预期关系1V1全案·¥128000',studyTime:'2024年9月-2025年3月',teacher:'乐涵老师',
+beforeProblem:'35岁外企高管，年薪百万但择偶一直不顺利。标准太高但又不愿降低，相亲30+次全部失败。觉得自己什么都好就是感情不行，但又不知道问题在哪。',
+afterChange:'6个月全案服务后，完全重新认知了自己的择偶定位。发现之前的"高标准"其实是在自我保护。最终和一个比自己小2岁的创业者在朋友聚会认识后自然发展，已经在一起4个月了。',
+comparison:[
+{before:'相亲30+次全部失败',after:'调整定位后1次聚会就遇到对的人'},
+{before:'标准高但不清晰',after:'区分了"面子标准"和"核心需求"'},
+{before:'觉得自己感情不行',after:'发现是定位问题而非个人问题'}
+],
+images:[],ratings:{professional:5,effect:5,service:5,value:5},tags:['30+不将就·清醒脱单','高净值择偶','不知道要什么','已甜蜜脱单','择偶认知翻盘'],status:'approved',createdAt:'2025-03-20T09:00:00'},
+{id:'r4',userId:'u_demo4',userName:'小诗',userAvatar:'',phone:'13800000004',isVerified:true,product:'p3',productName:'高净值择偶全案1V1·¥69800',studyTime:'2025年1月-5月',teacher:'李娜老师',
+beforeProblem:'29岁，每次谈恋爱都患得患失，总是不自觉讨好对方，最后被冷暴力分手。3段感情都是同样的模式，开始怀疑自己是不是不适合谈恋爱。',
+afterChange:'通过全案咨询找到了讨好型依恋的根源，学会了建立健康边界。现在和一个很尊重我的男生在一起，第一次在感情中不焦虑。',
+comparison:[
+{before:'每段感情都讨好+被冷暴力分手',after:'建立健康边界，不再焦虑讨好'},
+{before:'3段感情重复同样模式',after:'打破循环，找到尊重自己的伴侣'},
+{before:'怀疑自己不适合谈恋爱',after:'发现是模式问题，已成功调整'}
+],
+images:[],ratings:{professional:5,effect:5,service:4,value:4},tags:['优质男在哪·精准捕获','总怕失去他','关系不再内耗','内核稳了'],status:'approved',createdAt:'2025-05-10T16:00:00'},
+{id:'r5',userId:'u_demo5',userName:'Wendy',userAvatar:'',phone:'13800000005',isVerified:true,product:'p1',productName:'锁定优质伴侣社群·¥6980',studyTime:'2025年4月',teacher:'王芳老师',
+beforeProblem:'30岁体制内工作，圈子极度封闭，每天两点一线。想脱单但不知道怎么认识人，朋友介绍过但都不合适，开始有年龄焦虑。',
+afterChange:'训练营教了我拓展圈子的5个方法，现在每个月都能认识新的朋友。不是刻意相亲，而是自然社交中遇到的。心态也变好了，不再焦虑。',
+comparison:[
+{before:'圈子极度封闭，每天两点一线',after:'每月认识新朋友，社交圈打开'},
+{before:'有年龄焦虑，心态急躁',after:'心态放松，享受社交过程'},
+{before:'不知道怎么认识人',after:'掌握5种自然拓展圈子的方法'}
+],
+images:[],ratings:{professional:4,effect:4,service:4,value:5},tags:['30+不将就·清醒脱单','圈子打不开','圈子自然打开','内核稳了'],status:'approved',createdAt:'2025-04-25T11:00:00'}
+];
+
+function loadStore(){
+  // local cache fallback
+  try{const s=JSON.parse(localStorage.getItem(STORE_KEY));if(s)return s}catch(e){}
+  return {users:[],reviews:DEFAULT_REVIEWS,currentUser:null,session:{}};
+}
+function saveStore(s){localStorage.setItem(STORE_KEY,JSON.stringify(s))}
+let store=loadStore();
+let dataReady=false;
+async function loadFromFeishu(){
+  // 数据来源：同目录 reviews.json（由 lark-cli 从飞书 Base 导出，规避浏览器跨域限制）
+  // 写入链路：用户点击"写评价" → 跳转飞书表单 → 飞书 Base → 管理员审核后重新导出 reviews.json → H5 展示
+  let reviews=[];
+  try{
+    const res=await fetch('./reviews.json?_='+Date.now(),{cache:'no-store'});
+    if(res.ok){
+      const d=await res.json();
+      reviews=(d.reviews||d||[]).map(r=>Object.assign({},r));
+      console.log('loaded reviews.json',reviews.length,'条');
+    }
+  }catch(e){console.error('fetch reviews.json failed',e)}
+  if(!reviews.length){
+    console.warn('reviews.json 不可用，使用内置默认评价');
+    reviews=DEFAULT_REVIEWS.slice();
+  }
+  store.reviews=reviews;
+  store.users=[];
+  const local=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');
+  if(local.currentUser) store.currentUser=local.currentUser;
+  saveStore(store);
+  dataReady=true;
+}
+async function initApp(){
+  $('#app').innerHTML='<div class="flex items-center justify-center" style="height:100vh"><div class="text-gray-400 text-sm">加载中...</div></div>';
+  await loadFromFeishu();
+  $('#app').innerHTML=buildPages();
+  window.addEventListener('hashchange',handleRoute);
+  if(!location.hash)location.hash='#/home';
+  else handleRoute();
+}
+
+// ======================== UTILS ========================
+function $(sel,parent){return (parent||document).querySelector(sel)}
+function $$(sel,parent){return Array.from((parent||document).querySelectorAll(sel))}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2000)}
+function formatDate(d){const dt=new Date(d);const m=dt.getMonth()+1;const d2=dt.getDate();return`${dt.getFullYear()}年${m}月${d2}日`}
+function avgRating(r){const s=r.ratings;return((s.professional+s.effect+s.service+s.value)/4).toFixed(1)}
+function starsHtml(n){const full=Math.floor(n);const half=n-full>=.5;let html='';for(let i=0;i<5;i++){html+=`<span class="star-display">${i<full?'★':(i===full&&half?'☆':'☆')}</span>`}return html}
+function getProduct(id){return PRODUCTS.find(p=>p.id===id)}
+function escapeHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function isLogin(){return!!store.currentUser}
+
+// ======================== ROUTER ========================
+function goToForm(){
+  toast('正在跳转到评价填写表单...');
+  setTimeout(()=>{location.href=FEISHU.FORM_URL},800);
+}
+function navigate(page,param){
+  if(page==='submit'){goToForm();return}
+  location.hash=`#/${page}${param?'/'+param:''}`;
+}
+function handleRoute(){
+  const hash=location.hash.replace('#/','')||'home';
+  const[page,param]=hash.split('/');
+  $$('.page').forEach(p=>p.classList.remove('active'));
+  const target=document.getElementById('page-'+page);
+  if(target){target.classList.add('active');window.scrollTo(0,0);const init=window['init_'+page];if(init)init(param)}
+  else{init_home()}
+  updateNav(page);
+}
+function updateNav(page){$$('.nav-bottom a').forEach(a=>{a.classList.toggle('active',a.dataset.page===page)})}
+
+// ======================== COMPONENTS ========================
+function navBar(){
+  return`<nav class="nav-bottom flex justify-around"><a data-page="home" onclick="navigate('home')" class="flex-1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>评价墙</a><a data-page="submit" onclick="navigate('submit')" class="flex-1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>写评价</a><a data-page="profile" onclick="navigate('profile')" class="flex-1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</a></nav>`
+}
+
+function statsSection(){
+  const approved=store.reviews.filter(r=>r.status==='approved');
+  const total=approved.length;
+  const avg=total?(approved.reduce((s,r)=>+avgRating(r)+s,0)/total).toFixed(1):0;
+  const successCount=approved.filter(r=>r.tags.includes('已甜蜜脱单')).length;
+  const circleCount=approved.filter(r=>r.tags.includes('圈子自然打开')).length;
+  return`<div class="gradient-header text-white px-4 pt-12 pb-6 rounded-b-3xl">
+    <h1 class="text-xl font-bold text-center mb-1">择偶定位学员评价墙</h1>
+    <p class="text-center text-xs text-white/80 mb-4">真实学员反馈 · 持续更新</p>
+    <div class="grid grid-cols-4 gap-2">
+      <div class="text-center"><div class="text-2xl font-bold">${total}</div><div class="text-xs text-white/70">学员评价</div></div>
+      <div class="text-center"><div class="text-2xl font-bold">${avg}</div><div class="text-xs text-white/70">平均评分</div></div>
+      <div class="text-center"><div class="text-2xl font-bold">${successCount}</div><div class="text-xs text-white/70">已脱单</div></div>
+      <div class="text-center"><div class="text-2xl font-bold">${circleCount}</div><div class="text-xs text-white/70">圈子打开</div></div>
+    </div>
+  </div>`
+}
+
+function reviewCard(r){
+  const product=getProduct(r.product);
+  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-9 h-9 rounded-full object-cover">`:`<div class="w-9 h-9 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-sm">${r.userName[0]}</div>`;
+  const verified=r.isVerified?'<span class="text-blue-500 text-xs ml-1">✅已认证</span>':'';
+  const tagHtml=r.tags.slice(0,3).map(t=>`<span class="tag-chip" style="font-size:10px;padding:2px 8px">${t}</span>`).join('');
+  const imgCount=r.images&&r.images.length?`<span class="text-xs text-gray-400">📷 ${r.images.length}张</span>`:'';
+  return`<div class="review-card bg-white rounded-xl p-4 mb-3 shadow-sm" onclick="navigate('detail','${r.id}')">
+    <div class="flex items-center mb-2">
+      ${avatar}
+      <div class="ml-2 flex-1">
+        <div class="flex items-center"><span class="font-medium text-sm">${escapeHtml(r.userName)}</span>${verified}</div>
+        <div class="text-xs text-gray-400">${formatDate(r.createdAt)} · ${r.productName}</div>
+      </div>
+      <div class="text-right"><div class="star-display text-sm">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</div><div class="text-xs text-gray-400">${avgRating(r)}分</div></div>
+    </div>
+    <div class="text-truncate-2 text-sm text-gray-600 mb-2">${escapeHtml(r.beforeProblem)}</div>
+    <div class="text-truncate-2 text-sm text-pink-600 mb-2">→ ${escapeHtml(r.afterChange)}</div>
+    <div class="flex items-center justify-between"><div>${tagHtml}</div>${imgCount}</div>
+  </div>`
+}
+
+function loginPrompt(){
+  return`<div id="page-login" class="page active" style="min-height:100vh;background:#fff">
+    <div class="gradient-header text-white px-6 pt-16 pb-12 rounded-b-3xl text-center">
+      <div class="text-5xl mb-3">💕</div>
+      <h1 class="text-2xl font-bold mb-2">学员评价系统</h1>
+      <p class="text-white/80 text-sm">看看过去的学员都经历了怎样的改变</p>
+    </div>
+    <div class="px-6 pt-8">
+      <button onclick="navigate('home')" class="w-full py-3.5 rounded-xl bg-gray-100 text-gray-700 font-medium mb-3">游客浏览</button>
+      <button onclick="showLogin()" class="w-full py-3.5 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button>
+      <p class="text-center text-xs text-gray-400 mt-4">已认证学员可提交评价 · 游客可浏览全部内容</p>
+    </div>
+  </div>`
+}
+
+// ======================== PAGES ========================
+function buildPages(){
+  return`
+  <div id="page-home" class="page" style="padding-bottom:70px">
+    <div id="home-stats">${statsSection()}</div>
+    <div class="px-4 pt-4">
+      <div class="flex gap-2 overflow-x-auto pb-2" id="product-filter"></div>
+      <div class="flex gap-2 overflow-x-auto pb-2" id="tag-filter"></div>
+      <div id="review-list"></div>
+      <div id="load-more" class="text-center py-4 text-gray-400 text-sm hidden">加载更多...</div>
+    </div>
+  </div>
+
+  <div id="page-detail" class="page" style="padding-bottom:70px"></div>
+
+  <div id="page-submit" class="page" style="padding-bottom:70px"></div>
+
+  <div id="page-profile" class="page" style="padding-bottom:70px"></div>
+
+  <div id="page-admin" class="page" style="padding-bottom:70px"></div>
+
+  <div id="page-qrcode" class="page" style="padding-bottom:70px"></div>
+
+  ${navBar()}
+  `
+}
+
+// --- HOME ---
+function init_home(){
+  // Refresh stats
+  const hs=$('#home-stats');if(hs)hs.innerHTML=statsSection();
+  // Product filter
+  const pf=$('#product-filter');
+  pf.innerHTML=`<span class="tag-chip selected" onclick="filterProduct('')">全部</span>`+PRODUCTS.map(p=>`<span class="tag-chip" onclick="filterProduct('${p.id}')">${p.name}</span>`).join('');
+  // Tag filter
+  const tf=$('#tag-filter');
+  let tagHtml='<span class="tag-chip selected" onclick="filterTag(\'\')">全部</span>';
+  Object.values(TAGS).flat().forEach(t=>{tagHtml+=`<span class="tag-chip" onclick="filterTag('${t}')">${t}</span>`});
+  tf.innerHTML=tagHtml;
+  renderReviewList();
+}
+let currentProduct='',currentTag='';
+function filterProduct(id){currentProduct=id;$$('#product-filter .tag-chip').forEach(c=>c.classList.remove('selected'));event.target.classList.add('selected');renderReviewList()}
+function filterTag(t){currentTag=t;$$('#tag-filter .tag-chip').forEach(c=>c.classList.remove('selected'));event.target.classList.add('selected');renderReviewList()}
+function renderReviewList(){
+  let list=store.reviews.filter(r=>r.status==='approved');
+  if(currentProduct)list=list.filter(r=>r.product===currentProduct);
+  if(currentTag)list=list.filter(r=>r.tags.includes(currentTag));
+  list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const c=$('#review-list');
+  if(!list.length){c.innerHTML='<div class="text-center py-12 text-gray-400">暂无评价</div>';return}
+  c.innerHTML=list.map(r=>`<div class="fade-in-up">${reviewCard(r)}</div>`).join('');
+}
+
+// --- DETAIL ---
+function init_detail(id){
+  const r=store.reviews.find(x=>x.id===id);
+  if(!r){toast('评价不存在');navigate('home');return}
+  const product=getProduct(r.product);
+  const avatar=r.userAvatar?`<img src="${r.userAvatar}" class="w-12 h-12 rounded-full object-cover">`:`<div class="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-lg">${r.userName[0]}</div>`;
+  const verified=r.isVerified?'<span class="text-blue-500 text-xs">✅已认证学员</span>':'<span class="text-gray-400 text-xs">游客评价</span>';
+  const imgHtml=r.images&&r.images.length?`<div class="mt-4"><h3 class="font-bold text-sm mb-2">学习过程图片</h3><div class="grid grid-cols-3 gap-2">${r.images.map(img=>`<img src="${img}" class="w-full aspect-square object-cover rounded-lg" onclick="previewImg(this.src)">`).join('')}</div></div>`:'';
+  const comparisonHtml=r.comparison.map(c=>`<div class="grid grid-cols-2 gap-2 mb-2">
+    <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">学习前</div><div class="text-sm text-gray-700">${escapeHtml(c.before)}</div></div>
+    <div class="bg-pink-50 rounded-lg p-3"><div class="text-xs text-pink-400 mb-1">学习后</div><div class="text-sm text-pink-700">${escapeHtml(c.after)}</div></div>
+  </div>`).join('');
+  const tagHtml=r.tags.map(t=>`<span class="tag-chip selected" style="cursor:default">${t}</span>`).join('');
+  const ratings=Object.entries({professional:'专业能力',effect:'实际效果',service:'服务体验',value:'性价比'}).map(([k,label])=>`<div class="flex items-center justify-between py-2 border-b border-gray-50"><span class="text-sm text-gray-600">${label}</span><span class="star-display text-sm">${'★'.repeat(r.ratings[k])}${'☆'.repeat(5-r.ratings[k])}</span></div>`).join('');
+  $('#page-detail').innerHTML=`
+    <div class="gradient-header text-white px-4 pt-12 pb-4">
+      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
+      <div class="flex items-center mb-3">${avatar}<div class="ml-3"><div class="flex items-center gap-2"><span class="font-bold">${escapeHtml(r.userName)}</span>${verified}</div><div class="text-xs text-white/70">${r.productName} · ${r.studyTime}</div></div></div>
+      <div class="flex items-center gap-2"><span class="text-2xl">${avgRating(r)}</span><span class="star-display text-lg">${'★'.repeat(Math.round(avgRating(r)))}${'☆'.repeat(5-Math.round(avgRating(r)))}</span><span class="text-xs text-white/60">综合评分</span></div>
+    </div>
+    <div class="px-4 py-4">
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">📝 基本信息</h3><div class="text-sm text-gray-600 space-y-1"><div>学习产品：<span class="font-medium">${r.productName}</span></div><div>学习时间：${r.studyTime}</div><div>指导老师：${r.teacher}</div></div></div>
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">😰 学习前的问题</h3><p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(r.beforeProblem)}</p></div>
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-pink-600">✨ 学习后的变化</h3><p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(r.afterChange)}</p></div>
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">📊 前后对比</h3>${comparisonHtml}</div>
+      ${imgHtml}
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">⭐ 多维度评分</h3>${ratings}</div>
+      <div class="bg-white rounded-xl p-4 mb-3 shadow-sm"><h3 class="font-bold text-sm mb-2 text-gray-800">🏷️ 标签</h3><div>${tagHtml}</div></div>
+      <div class="text-xs text-gray-400 text-center mt-4">发布于 ${formatDate(r.createdAt)}</div>
+      <div class="mt-6"><a href="#" onclick="navigate('submit');return false" class="block w-full py-3 rounded-xl bg-pink-500 text-white text-center font-medium">我也要分享我的改变 →</a></div>
+    </div>`;
+}
+function previewImg(src){const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center';o.onclick=()=>o.remove();o.innerHTML=`<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px">`;document.body.appendChild(o)}
+
+// --- LOGIN ---
+function showLogin(){
+  const modal=document.createElement('div');
+  modal.id='login-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+    <h2 class="text-lg font-bold mb-4 text-center">登录 / 注册</h2>
+    <div class="mb-3"><input id="login-phone" type="tel" maxlength="11" placeholder="手机号" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+    <div class="mb-3 flex gap-2"><input id="login-code" type="tel" maxlength="6" placeholder="验证码" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm" oninput="this.value=this.value.replace(/[^0-9]/g,'')"><button id="send-code-btn" onclick="sendCode()" class="px-4 py-3 rounded-xl bg-pink-100 text-pink-600 text-sm font-medium whitespace-nowrap">获取验证码</button></div>
+    <div class="mb-3"><input id="login-name" type="text" placeholder="昵称（选填）" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"></div>
+    <button onclick="doLogin()" class="w-full py-3 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button>
+    <button onclick="document.getElementById('login-modal').remove();navigate('home')" class="w-full py-3 mt-2 text-gray-400 text-sm">游客浏览</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+let codeTimer=null;
+function sendCode(){
+  const phone=$('#login-phone').value;
+  if(!/^1\d{10}$/.test(phone)){toast('请输入正确的手机号');return}
+  toast('验证码已发送：123456（演示用）');
+  let sec=60;const btn=$('#send-code-btn');btn.disabled=true;
+  codeTimer=setInterval(()=>{sec--;btn.textContent=`${sec}s后重发`;if(sec<=0){clearInterval(codeTimer);btn.disabled=false;btn.textContent='获取验证码'}},1000);
+}
+async function doLogin(){
+  const phone=$('#login-phone').value;
+  const code=$('#login-code').value;
+  const name=$('#login-name').value||('用户'+phone.slice(-4));
+  if(!/^1\d{10}$/.test(phone)){toast('请输入正确的手机号');return}
+  if(code!=='123456'){toast('验证码错误，请输入123456');return}
+  let user=store.users.find(u=>u.phone===phone);
+  if(!user){
+    user={id:'u_'+Date.now(),phone,name,userAvatar:'',isVerified:false,createdAt:new Date().toISOString()};
+    store.users.push(user);
+    // create in feishu
+    try{
+      const rid=await feishuCreate(FEISHU.TABLE_USERS,userToRecord(user));
+      user.recordId=rid;
+    }catch(e){console.error('create user failed',e)}
+  }else{
+    user.name=name;
+    // update in feishu
+    if(user.recordId){
+      try{await feishuUpdate(FEISHU.TABLE_USERS,user.recordId,{'昵称':name})}catch(e){console.error('update user failed',e)}
+    }
+  }
+  store.currentUser=user;
+  saveStore(store);
+  const m=document.getElementById('login-modal');if(m)m.remove();
+  if(codeTimer)clearInterval(codeTimer);
+  toast('登录成功');
+  navigate('home');
+}
+
+// --- SUBMIT ---
+let submitState={images:[],ratings:{professional:0,effect:0,service:0,value:0},tags:[]};
+function init_submit(){
+  if(!isLogin()){toast('请先登录');showLogin();return}
+  const user=store.currentUser;
+  const verified=user.isVerified?'<span class="text-blue-500 text-xs">✅已认证学员</span>':'<span class="text-orange-500 text-xs">⚠️未认证（评价将标注为游客）</span>';
+  const productOpts=PRODUCTS.map(p=>`<option value="${p.id}">${p.name} - ${p.desc}</option>`).join('');
+  const teacherOpts=TEACHERS.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const tagHtml=Object.entries(TAGS).map(([cat,tags])=>`<div class="mb-2"><div class="text-xs text-gray-400 mb-1">${cat}</div>${tags.map(t=>`<span class="tag-chip" onclick="toggleTag('${t}')">${t}</span>`).join('')}</div>`).join('');
+  submitState={images:[],ratings:{professional:0,effect:0,service:0,value:0},tags:[]};
+  $('#page-submit').innerHTML=`
+    <div class="gradient-header text-white px-4 pt-12 pb-4">
+      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
+      <h1 class="text-xl font-bold">分享我的学习经历</h1>
+      <p class="text-xs text-white/70 mt-1">你的分享将帮助更多姐妹做出选择</p>
+    </div>
+    <div class="px-4 py-4">
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <div class="text-sm font-medium mb-1">${escapeHtml(user.name)} ${verified}</div>
+        <div class="text-xs text-gray-400">手机号：${user.phone}</div>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">学习产品 *</label>
+        <select id="f-product" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm">${productOpts}</select>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">学习时间 *</label>
+        <input id="f-time" type="text" placeholder="如：2025年3月-6月" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm">
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">指导老师 *</label>
+        <select id="f-teacher" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"><option value="">请选择</option>${teacherOpts}</select>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">学习前的问题 *</label>
+        <textarea id="f-before" rows="4" placeholder="描述你学习之前遇到的具体问题..." class="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm resize-none"></textarea>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2 text-pink-600">学习后的变化 *</label>
+        <textarea id="f-after" rows="4" placeholder="描述你学习之后取得了什么改变..." class="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm resize-none"></textarea>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3" id="comparison-block">
+        <label class="block text-sm font-bold mb-2">前后对比（选填，建议填写）</label>
+        <p class="text-xs text-gray-400 mb-2">添加2-3组对比，展示最显著的变化</p>
+        <div id="comparison-list"></div>
+        <button onclick="addComparison()" class="text-sm text-pink-500 mt-2">+ 添加对比</button>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">上传学习过程图片（选填）</label>
+        <div id="image-preview" class="flex flex-wrap"></div>
+        <input type="file" id="f-images" accept="image/*" multiple class="hidden" onchange="handleImages(this)">
+        <button onclick="$('#f-images').click()" class="text-sm text-pink-500">+ 选择图片</button>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">多维度评分 *</label>
+        ${['professional|专业能力','effect|实际效果','service|服务体验','value|性价比'].map(item=>{const[k,l]=item.split('|');return`<div class="flex items-center justify-between py-2"><span class="text-sm text-gray-600">${l}</span><div class="star-input-group" data-key="${k}">${[1,2,3,4,5].map(n=>`<span class="star-input" data-val="${n}" onclick="setRating('${k}',${n})">★</span>`).join('')}</div></div>`}).join('')}
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+        <label class="block text-sm font-bold mb-2">选择标签</label>
+        ${tagHtml}
+      </div>
+      <button onclick="submitReview()" class="w-full py-3.5 rounded-xl bg-pink-500 text-white font-bold text-sm mb-3">提交评价</button>
+      <p class="text-center text-xs text-gray-400">提交后需管理员审核通过后公开展示</p>
+    </div>`;
+  addComparison();addComparison();
+}
+let comparisonCount=0;
+function addComparison(){
+  comparisonCount++;
+  const div=document.createElement('div');
+  div.className='grid grid-cols-2 gap-2 mb-2';
+  div.innerHTML=`<input type="text" placeholder="学习前..." class="px-3 py-2 rounded-lg border border-gray-200 text-xs c-before" oninput="this.value"><input type="text" placeholder="学习后..." class="px-3 py-2 rounded-lg border border-gray-200 text-xs c-after">`;
+  $('#comparison-list').appendChild(div);
+}
+function setRating(key,val){
+  submitState.ratings[key]=val;
+  $$(`.star-input-group[data-key="${key}"] .star-input`).forEach(s=>{s.classList.toggle('active',+s.dataset.val<=val)});
+}
+function toggleTag(t){
+  const idx=submitState.tags.indexOf(t);
+  if(idx>=0)submitState.tags.splice(idx,1);else submitState.tags.push(t);
+  event.target.classList.toggle('selected');
+}
+function handleImages(input){
+  const files=Array.from(input.files);
+  files.forEach(f=>{
+    if(f.size>5*1024*1024){toast('图片不能超过5MB');return}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      submitState.images.push(e.target.result);
+      renderImagePreview();
+    };
+    reader.readAsDataURL(f);
+  });
+  input.value='';
+}
+function renderImagePreview(){
+  $('#image-preview').innerHTML=submitState.images.map((src,i)=>`<div class="upload-preview"><img src="${src}"><span class="remove" onclick="removeImage(${i})">×</span></div>`).join('');
+}
+function removeImage(i){submitState.images.splice(i,1);renderImagePreview()}
+async function submitReview(){
+  const user=store.currentUser;
+  const product=$('#f-product').value;
+  const studyTime=$('#f-time').value.trim();
+  const teacher=$('#f-teacher').value;
+  const before=$('#f-before').value.trim();
+  const after=$('#f-after').value.trim();
+  if(!studyTime){toast('请填写学习时间');return}
+  if(!teacher){toast('请选择指导老师');return}
+  if(before.length<10){toast('请详细描述学习前的问题（至少10字）');return}
+  if(after.length<10){toast('请详细描述学习后的变化（至少10字）');return}
+  for(const k of['professional','effect','service','value']){if(!submitState.ratings[k]){toast('请完成所有维度评分');return}}
+  const comparisons=[];
+  $$('#comparison-list > div').forEach(d=>{const b=d.querySelector('.c-before').value.trim();const a=d.querySelector('.c-after').value.trim();if(b&&a)comparisons.push({before:b,after:a})});
+  const productObj=getProduct(product);
+  // upload images to feishu, get file_tokens
+  const imgTokens=[];
+  for(const dataUrl of submitState.images){
+    try{const t=await feishuUploadImage(dataUrl);imgTokens.push(t)}catch(e){console.error('img upload failed',e)}
+  }
+  const review={
+    id:'r_'+Date.now(),userId:user.id,userName:user.name,userAvatar:user.userAvatar||'',phone:user.phone,isVerified:user.isVerified,
+    product,productName:productObj.name,studyTime,teacher,beforeProblem:before,afterChange:after,comparison:comparisons,images:imgTokens,
+    ratings:{...submitState.ratings},tags:submitState.tags.slice(),status:'pending',createdAt:new Date().toISOString()
+  };
+  store.reviews.push(review);
+  saveStore(store);
+  // create in feishu
+  try{
+    const rid=await feishuCreate(FEISHU.TABLE_REVIEWS,reviewToRecord(review));
+    review.recordId=rid;
+    saveStore(store);
+  }catch(e){console.error('create review failed',e);toast('提交失败，请重试');return}
+  toast('评价提交成功，等待审核');
+  setTimeout(()=>navigate('home'),1500);
+}
+
+// --- PROFILE ---
+function init_profile(){
+  if(!isLogin()){$('#page-profile').innerHTML=`<div class="px-4 pt-16 text-center"><div class="text-5xl mb-4">👤</div><h2 class="text-lg font-bold mb-2">未登录</h2><p class="text-sm text-gray-400 mb-6">登录后可提交评价和管理个人信息</p><button onclick="showLogin()" class="px-8 py-3 rounded-xl bg-pink-500 text-white font-medium">登录 / 注册</button><button onclick="navigate('home')" class="block w-full mt-3 text-gray-400 text-sm">游客浏览</button></div>`;return}
+  const user=store.currentUser;
+  const myReviews=store.reviews.filter(r=>r.userId===user.id);
+  const avatar=user.userAvatar?`<img src="${user.userAvatar}" class="w-16 h-16 rounded-full object-cover">`:`<div class="w-16 h-16 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-2xl">${user.name[0]}</div>`;
+  const verifiedHtml=user.isVerified?'<span class="text-blue-500 text-xs">✅已认证学员</span>':'<span class="text-orange-500 text-xs">⚠️未认证</span>';
+  const myReviewHtml=myReviews.length?myReviews.map(r=>{
+    const statusMap={approved:'<span class="text-green-500 text-xs">已发布</span>',pending:'<span class="text-orange-500 text-xs">审核中</span>',rejected:'<span class="text-red-500 text-xs">未通过</span>'};
+    return`<div class="bg-white rounded-xl p-3 mb-2 shadow-sm" onclick="navigate('detail','${r.id}')"><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium">${r.productName}</span>${statusMap[r.status]||''}</div><div class="text-xs text-gray-400">${formatDate(r.createdAt)}</div></div>`
+  }).join(''):'<div class="text-center py-8 text-gray-400 text-sm">还没有评价，去分享你的经历吧</div>';
+  $('#page-profile').innerHTML=`
+    <div class="gradient-header text-white px-4 pt-12 pb-6 rounded-b-3xl">
+      <div class="flex items-center mb-4">${avatar}<div class="ml-3"><div class="font-bold text-lg">${escapeHtml(user.name)}</div><div class="text-xs text-white/70">${user.phone}</div><div class="mt-1">${verifiedHtml}</div></div></div>
+    </div>
+    <div class="px-4 pt-4">
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3"><h3 class="text-sm font-bold mb-3">我的评价 (${myReviews.length})</h3>${myReviewHtml}</div>
+      <button onclick="navigate('submit')" class="w-full py-3 rounded-xl bg-pink-50 text-pink-600 font-medium text-sm mb-2">+ 写新评价</button>
+      <button onclick="navigate('qrcode')" class="w-full py-3 rounded-xl bg-gray-50 text-gray-600 font-medium text-sm mb-2">📱 生成评价墙二维码</button>
+      <button onclick="navigate('admin')" class="w-full py-3 rounded-xl bg-gray-50 text-gray-600 font-medium text-sm mb-2">⚙️ 管理后台</button>
+      <button onclick="logout()" class="w-full py-3 rounded-xl bg-gray-50 text-red-500 font-medium text-sm">退出登录</button>
+    </div>`;
+}
+function logout(){store.currentUser=null;saveStore(store);toast('已退出');navigate('home')}
+
+// --- ADMIN ---
+function init_admin(){
+  const pending=store.reviews.filter(r=>r.status==='pending');
+  const approved=store.reviews.filter(r=>r.status==='approved');
+  const rejected=store.reviews.filter(r=>r.status==='rejected');
+  const allUsers=store.users;
+  $('#page-admin').innerHTML=`
+    <div class="gradient-header text-white px-4 pt-12 pb-4">
+      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
+      <h1 class="text-xl font-bold">管理后台</h1>
+    </div>
+    <div class="px-4 pt-4">
+      <div class="grid grid-cols-3 gap-2 mb-4">
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm"><div class="text-xl font-bold text-orange-500">${pending.length}</div><div class="text-xs text-gray-400">待审核</div></div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm"><div class="text-xl font-bold text-green-500">${approved.length}</div><div class="text-xs text-gray-400">已通过</div></div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm"><div class="text-xl font-bold text-red-500">${rejected.length}</div><div class="text-xs text-gray-400">已拒绝</div></div>
+      </div>
+      <div class="bg-white rounded-xl p-4 shadow-sm mb-3"><h3 class="text-sm font-bold mb-3">注册用户 (${allUsers.length})</h3><div class="text-xs text-gray-500 space-y-1">${allUsers.map(u=>`<div class="flex justify-between"><span>${u.name} (${u.phone})</span>${u.isVerified?'<span class="text-blue-500">已认证</span>':'<span class="text-gray-400">未认证</span>'}</div>`).join('')||'<div class="text-gray-400">暂无注册用户</div>'}</div></div>
+      <h3 class="text-sm font-bold mb-2">待审核评价</h3>
+      <div id="pending-list">${pending.length?pending.map(r=>adminReviewCard(r)).join(''):'<div class="text-center py-8 text-gray-400 text-sm">暂无待审核评价</div>'}</div>
+      <h3 class="text-sm font-bold mb-2 mt-4">已通过评价</h3>
+      <div>${approved.map(r=>adminReviewCard(r)).join('')}</div>
+    </div>`;
+}
+function adminReviewCard(r){
+  const statusMap={approved:'<span class="text-green-500">已通过</span>',pending:'<span class="text-orange-500">审核中</span>',rejected:'<span class="text-red-500">已拒绝</span>'};
+  let actions='';
+  if(r.status==='pending')actions=`<button onclick="reviewAction('${r.id}','approved')" class="text-xs text-green-600 px-3 py-1 rounded bg-green-50">通过</button><button onclick="reviewAction('${r.id}','rejected')" class="text-xs text-red-600 px-3 py-1 rounded bg-red-50 ml-1">拒绝</button>`;
+  if(r.status==='approved')actions=`<button onclick="reviewAction('${r.id}','rejected')" class="text-xs text-red-600 px-3 py-1 rounded bg-red-50">下架</button>`;
+  if(r.status==='rejected')actions=`<button onclick="reviewAction('${r.id}','approved')" class="text-xs text-green-600 px-3 py-1 rounded bg-green-50">恢复</button>`;
+  const toggleVerified=r.isVerified?'<span class="text-blue-500 text-xs">✅</span>':'<span class="text-gray-400 text-xs">未认证</span>';
+  return`<div class="bg-white rounded-xl p-3 mb-2 shadow-sm"><div class="flex justify-between items-start mb-1"><div><span class="font-medium text-sm">${escapeHtml(r.userName)}</span> ${toggleVerified}</div>${statusMap[r.status]||''}</div><div class="text-xs text-gray-400 mb-1">${r.productName} · ${r.studyTime} · ${r.teacher}</div><div class="text-xs text-gray-500 text-truncate-2 mb-2">${escapeHtml(r.beforeProblem)}</div><div class="flex items-center justify-between"><span class="text-xs text-gray-400">${formatDate(r.createdAt)}</span><div>${actions}<button onclick="toggleUserVerified('${r.userId}')" class="text-xs text-blue-600 px-3 py-1 rounded bg-blue-50 ml-1">${r.isVerified?'取消认证':'认证学员'}</button></div></div></div>`
+}
+async function reviewAction(id,action){
+  const r=store.reviews.find(x=>x.id===id);
+  if(r){
+    r.status=action;
+    saveStore(store);
+    toast('本地预览已更新。正式审核请在飞书 Base 中修改「状态」字段，再重新导出 reviews.json');
+    init_admin();
+  }
+}
+async function toggleUserVerified(userId){
+  const u=store.users.find(x=>x.id===userId);
+  if(u){
+    u.isVerified=!u.isVerified;
+    store.reviews.filter(r=>r.userId===userId).forEach(r=>{r.isVerified=u.isVerified});
+    saveStore(store);
+    toast('本地预览已更新。正式认证请在飞书 Base 中修改「是否认证学员」字段，再重新导出 reviews.json');
+    init_admin();
+  }else{
+    const reviews=store.reviews.filter(r=>r.userId===userId);
+    if(reviews.length){
+      reviews.forEach(r=>r.isVerified=!r.isVerified);
+      saveStore(store);
+      toast('本地预览已更新。正式认证请在飞书 Base 中修改「是否认证学员」字段，再重新导出 reviews.json');
+      init_admin();
+    }
+  }
+}
+
+// --- QRCODE ---
+function init_qrcode(){
+  const url=location.origin+location.pathname;
+  $('#page-qrcode').innerHTML=`
+    <div class="gradient-header text-white px-4 pt-12 pb-4">
+      <button onclick="navigate('home')" class="text-white/80 text-sm mb-2">← 返回</button>
+      <h1 class="text-xl font-bold">评价墙二维码</h1>
+      <p class="text-xs text-white/70 mt-1">扫码即可进入学员评价墙</p>
+    </div>
+    <div class="px-4 py-6 text-center">
+      <div class="bg-white rounded-2xl p-6 shadow-sm mx-auto inline-block">
+        <div id="qrcode-container" class="inline-block"></div>
+        <h2 class="text-lg font-bold mt-4 text-gray-800">择偶定位学员评价墙</h2>
+        <p class="text-xs text-gray-400 mt-1">扫码查看真实学员反馈</p>
+      </div>
+      <div class="mt-6 bg-white rounded-xl p-4 shadow-sm text-left">
+        <h3 class="text-sm font-bold mb-2">📋 使用说明</h3>
+        <ol class="text-xs text-gray-500 space-y-1 list-decimal pl-4">
+          <li>将二维码打印或发送给学员</li>
+          <li>学员扫码后进入评价墙</li>
+          <li>游客可直接浏览所有评价</li>
+          <li>已认证学员可登录后提交评价</li>
+          <li>管理员在「我的→管理后台」审核评价</li>
+        </ol>
+      </div>
+      <div class="mt-4 bg-gray-50 rounded-xl p-3">
+        <p class="text-xs text-gray-400 mb-1">评价墙链接：</p>
+        <p class="text-xs text-blue-500 break-all">${url}</p>
+      </div>
+      <button onclick="downloadQR()" class="mt-4 px-8 py-2.5 rounded-xl bg-pink-500 text-white text-sm font-medium">保存二维码图片</button>
+    </div>`;
+  // Generate QR code
+  const container=$('#qrcode-container');
+  container.innerHTML='';
+  new QRCode(container,{text:url,width:200,height:200,colorDark:'#1f2937',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+}
+function downloadQR(){
+  const img=$('#qrcode-container img');
+  if(!img){toast('二维码未生成');return}
+  const a=document.createElement('a');
+  a.href=img.src;
+  a.download='review-wall-qrcode.png';
+  a.click();
+  toast('已保存');
+}
+
+// ======================== INIT ========================
+initApp();
+</script>
+</body>
+</html>
