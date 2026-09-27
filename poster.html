@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学员评价墙二维码</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+.poster{background:#fff;border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.1);overflow:hidden;max-width:420px;width:100%}
+.gradient-bg{background:linear-gradient(135deg,#ec4899 0%,#f43f5e 50%,#e11d48 100%)}
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="gradient-bg text-white px-8 pt-10 pb-8 text-center">
+    <div class="text-5xl mb-3">💕</div>
+    <h1 class="text-2xl font-bold mb-1">择偶定位学员评价墙</h1>
+    <p class="text-white/80 text-sm">扫码查看真实学员的学习成果与蜕变故事</p>
+  </div>
+  <div class="px-8 py-8 text-center">
+    <div class="inline-block p-4 bg-gray-50 rounded-2xl mb-4">
+      <img src="review-qrcode.png" alt="评价墙二维码" class="w-64 h-64 mx-auto" id="qr-img">
+    </div>
+    <div class="mb-6">
+      <p class="text-sm text-gray-500 mb-1">📱 微信 / 支付宝 / 相机扫码均可</p>
+      <p class="text-xs text-gray-400">游客可直接浏览 · 学员可登录评价</p>
+    </div>
+    <div class="bg-pink-50 rounded-xl p-4 mb-4 text-left">
+      <h3 class="text-sm font-bold text-pink-600 mb-2">📋 使用场景</h3>
+      <ul class="text-xs text-gray-600 space-y-1.5">
+        <li>1. 课程交付后发给学员扫码写评价</li>
+        <li>2. 朋友圈/社群分享，吸引潜在客户查看</li>
+        <li>3. 打印贴在线下活动物料上</li>
+        <li>4. 嵌入公众号文章引导扫码</li>
+      </ul>
+    </div>
+    <div class="bg-gray-50 rounded-xl p-3 mb-4">
+      <p class="text-xs text-gray-400 mb-1">评价墙链接：</p>
+      <p class="text-xs text-blue-500 break-all" id="url-text">https://long-queen-1cb4.pages.dev</p>
+    </div>
+    <button onclick="downloadQR()" class="w-full py-3 rounded-xl bg-pink-500 text-white font-medium text-sm mb-2">⬇ 保存二维码图片</button>
+    <button onclick="downloadPoster()" class="w-full py-3 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm">⬇ 保存完整海报</button>
+  </div>
+</div>
+<script>
+function downloadQR(){
+  const a=document.createElement('a');
+  a.href='review-qrcode.png';
+  a.download='择偶定位评价墙-二维码.png';
+  a.click();
+}
+function downloadPoster(){
+  window.print();
+}
+</script>
+</body>
+</html>
